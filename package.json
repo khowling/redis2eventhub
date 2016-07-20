@@ -1,0 +1,19 @@
+{
+  "name": "redis2events",
+  "version": "0.0.1",
+  "description": "Subscribe to redis queue and sent events",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "azure-event-hubs": "0.0.2",
+    "ioredis": "^2.2.0"
+  },
+  "engines": {
+    "version": "6.2.1"
+  }
+}
