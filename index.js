@@ -23,6 +23,7 @@ const partitionId = '0';
 var client = eventHub.fromConnectionString(connectionString, eventHubPath);
 client.createSender(partitionId).then((sender) => {
     sender.on('errorReceived',  (err) => { console.log(err); });
+
     console.log ('created EventHub Sender');
 
     const REDIS_CHANNEL = 'clickpath';
@@ -35,20 +36,18 @@ client.createSender(partitionId).then((sender) => {
     });
 
     redis.on('message', function (channel, message) {
-        console.log(`Receive message ${message} from channel ${channel}`);
+        console.log(`ch#${channel} Receive message ${message}`);
         sender.send(message).then ((res) => {
-            console.log (`sent: ${JSON.stringify(res)}`);
+            //console.log (`sent: ${JSON.stringify(res)}`);
         });
     });
 
-    process.on ("exit", (code) => {
-        sender.close().then((res) => console.log ('closed sender'));
-        client.close().then((res) => console.log ('closed client'));
+    process.on ('SIGINT', (code) => {
+        try {
+            sender.close().then((res) => console.log ('closed sender'));
+            console.log ('closed connetions');
+        } catch (e) {
+
+        }
     })
 });
-
-
-
-
-
-
