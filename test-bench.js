@@ -21,7 +21,8 @@ if (cluster.isMaster) {
         const REDIS_CHANNEL = 'clickpath';
         let promiseArray = [];
         for (var l = 0; l < (process.env.MESSAGES || 1000); l++) {
-            let publish_promise = redis.publish(REDIS_CHANNEL,  `{"itteration": ${l}, "workerid": ${cluster.worker.id}, "message": "hello from ${cluster.worker.id}:${l}"}`);
+            //let publish_promise = redis.publish(REDIS_CHANNEL,  `{"itteration": ${l}, "workerid": ${cluster.worker.id}, "message": "hello from ${cluster.worker.id}:${l}"}`);
+            let publish_promise = redis.lpush(REDIS_CHANNEL,  `{"itteration": ${l}, "workerid": ${cluster.worker.id}, "message": "hello from ${cluster.worker.id}:${l}"}`);
             if (process.env.DELAY) {
                 promiseArray.push (() => {return new Promise((a,b) => setTimeout (() => {console.log (`send from ${cluster.worker.id}/${l}`); publish_promise.then(() => a());}, process.env.DELAY))});
             } else {
