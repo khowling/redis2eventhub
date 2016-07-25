@@ -31,19 +31,24 @@ var sent = 0, confirmed = 0, errors = 0
 client.connect(AMQP_URL).then(() => {
     client.createSender(ENTITY_PATH).then ((sender) => {
         sender.on('errorReceived', function (tx_err) { console.warn('===> TX ERROR: ', tx_err); });
-        //let message = { DataString: 'From Node', DataValue: "hello from index2" }; 
+        //let test_message = { DataString: 'From Node', DataValue: "hello from index2" }; 
         let options = { annotations: { 'x-opt-partition-key': 'pk' + 'nodeapp' } }; 
         let subscribe = () => {
                 redis.brpop(REDIS_CHANNEL, 0).then ((message) => {
-                    sender.send(message).then ((res) => {
-                        // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
-                        confirmed++; 
-                    }, (err) => {
-                        errors++;
-                        console.log (`===> TX ERROR: ${JSON.stringify(err)}`)
-                    });
-                    sent++
-                    subscribe()
+                    try {
+                        let msg = JSON.parse(message[1]);
+                        sender.send(msg).then ((res) => {
+                            // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
+                            confirmed++; 
+                        }, (err) => {
+                            errors++;
+                            console.log (`===> TX ERROR: ${JSON.stringify(err)}`)
+                        });
+                        sent++
+                        subscribe()
+                    } catch (e) {
+                        console.error (`failed to process redis message ${e}`);
+                    }
                 });
             };
         // start the blocking loop
