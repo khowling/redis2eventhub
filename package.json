@@ -10,8 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "azure-event-hubs": "0.0.2",
-    "ioredis": "^2.2.0"
+    "ioredis": "^2.2.0",
+    "amqp10": "^3.2.2"
   },
   "engines": {
     "version": "6.2.1"

@@ -1,90 +1,74 @@
 
-const eventHub = require('azure-event-hubs').Client
-const Redis = require('ioredis')
+const amqp10 = require('amqp10'),
+    AMQPClient = amqp10.Client,
+    Policy = amqp10.Policy,
+    Redis = require('ioredis'),
+    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379/3', {
+        enableOfflineQueue: true,
+        reconnectOnError: function (err) {
+            console.log(`redis err ${err}`)
+        },
+        retryStrategy: function (times) {
+            var delay = Math.min(times * 2, 2000)
+            return delay
+        }
+    });
 
-const redis = new Redis('redis://localhost:6379/3', {
-enableOfflineQueue: true,
-reconnectOnError: function (err) {
-    console.log(`redis err ${err}`)
-},
-retryStrategy: function (times) {
-    var delay = Math.min(times * 2, 2000)
-    return delay
-}
-});
 redis.on("ready", (c) => console.log ('redis ready'))
 redis.on("error", (c) => console.log (`redis error: ${JSON.stringify(c)}`))
 
+const REDIS_CHANNEL = process.env.REDIS_CHANNEL || 'clickpath' // redis queue
+const ENTITY_PATH = process.env.ENTITY_PATH // enventhub namespace
+const AMQP_URL = process.env.AMQP_URL
 
-const connectionString = 'Endpoint=sb://mapusageingest-ns.servicebus.windows.net/;SharedAccessKeyName=RedisSend;SharedAccessKey=PHyXTDY09cfC3pIpCLKc5cHX8rB6tGPrROa4u+vG6dc=;EntityPath=mapusageingest'
-const eventHubPath = '/clickpath'
-const partitionId = '0'
-
-// -------------------- Connect to Azure Event Hub
-var client = eventHub.fromConnectionString(connectionString, eventHubPath);
-client.createSender(partitionId).then((sender) => {
-    sender.on('errorReceived',  (err) => { console.log(err); })
-
-    console.log (`Created EventHub Sender`)
-
-    const REDIS_CHANNEL = 'clickpath'
-
-    /* -- uncomment if using pub/sub
-    redis.subscribe(REDIS_CHANNEL,  (err, count) => {
-        if (err) {
-            process.exitCode = 1;
-            throw new Error(`cannot subscribe to redis channel ${REDIS_CHANNEL}`);
-        } 
-        console.log (`subscribed to channel ${REDIS_CHANNEL} (#=${count})`);
-    });
-    redis.on('message', (channel, message) => {
-    */
-
-    // pop loop
-    const max_send_waiting = process.env.CONCURRENT || 20
-    let sent = 0 , confirmed = 0, errors = 0,
-        subscribe = () => {
-            redis.brpop(REDIS_CHANNEL, 0).then ((message) => {
-                sender.send(message).then ((res) => {
-                    // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
-                    confirmed++; 
-            //      if (send_waiting == (max_send_waiting - 1)) 
-            //         subscribe();
-                    //console.log (`sent: ${JSON.stringify(res)}`);
-                }, (err) => {
-                    errors++;
-            //      if (send_waiting == (max_send_waiting - 1)) 
-            //         subscribe();
-                    console.log (`send error: ${JSON.stringify(err)}`)
-                });
-
-                sent++
-                //  if (send_waiting < max_send_waiting) 
+if (!ENTITY_PATH || !AMQP_URL) {
+    console.warn ("ENTITY_PATH and AMQP_URL need to be set");
+    process.exit(1);
+}
+   
+var client = new AMQPClient(Policy.EventHub) // Uses PolicyBase default policy
+var sent = 0, confirmed = 0, errors = 0
+client.connect(AMQP_URL).then(() => {
+    client.createSender(ENTITY_PATH).then ((sender) => {
+        sender.on('errorReceived', function (tx_err) { console.warn('===> TX ERROR: ', tx_err); });
+        //let message = { DataString: 'From Node', DataValue: "hello from index2" }; 
+        let options = { annotations: { 'x-opt-partition-key': 'pk' + 'nodeapp' } }; 
+        let subscribe = () => {
+                redis.brpop(REDIS_CHANNEL, 0).then ((message) => {
+                    sender.send(message).then ((res) => {
+                        // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
+                        confirmed++; 
+                    }, (err) => {
+                        errors++;
+                        console.log (`===> TX ERROR: ${JSON.stringify(err)}`)
+                    });
+                    sent++
                     subscribe()
-            });
-        };
+                });
+            };
+        // start the blocking loop
+        subscribe();
 
-    // print metrics if they change
-    var l = -1, s = 0, c = 0, e = 0
-    setInterval(() => {
-        //redis.llen(REDIS_CHANNEL).then( (llen) => {
-            if (sent !== s || confirmed !== c || errors !== e) {
-                s = sent; c = confirmed; e = errors
-                console.log (`errors: ${errors}, confirmed: ${confirmed}, inprogress: ${sent - confirmed}`)
+        // close down connections on ctrl-c
+        process.on ('SIGINT', (code) => {
+            try {
+                sender.detach().then((res) => console.log ('closed sender'))
+                console.log ('closed connetions')
+            } catch (e) {
+                console.log (`cannot detach sender: ${e}`)
             }
-        //}, (err) => console.log (`cannot get list length ${err}`))
-    }, 2000);
+            process.exit(0)
+        })
+    }, (err) => console.log (`failed to create sneder : ${err}`))
+}, (err) => console.log (`failed to connect to eventhub : ${err}`))
 
-    subscribe();
 
-    // close down connections on ctrl-c
-    process.on ('SIGINT', (code) => {
-        try {
-            sender.close().then((res) => console.log ('closed sender'));
-            console.log ('closed connetions');
-            process.exit(0);
-        } catch (e) {
+// stdout logging
+var s = 0, c = 0, e = 0 // to detect changes in metrics, only log if changed
+setInterval(() => {
+    if (sent !== s || confirmed !== c || errors !== e) {
+        s = sent; c = confirmed; e = errors;
+        console.log (`inprogress: ${sent - confirmed}, confirmed: ${confirmed}, errors: ${errors})`)
+    }
+}, 2000);
 
-        }
-    })
-});
