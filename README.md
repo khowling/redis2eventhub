@@ -11,13 +11,19 @@ to start run:
 Files
 
 index.js :  sends data from a Redis queue to an Azure eventhub
+
 rx.js : receive data from the hub (just for debugging verification)
+
 test-bench.js: pumps data into redis using a cluster for 4 processes (bench testing)
 
 environment variables
+
 REDIS_URL:  <default: 'redis://localhost:6379/3'>
+
 REDIS_CHANNEL: The Redis List Key <default: 'clickpath'>
+
 *ENTITY_PATH: The Azure eventhub Entity name
+
 *AMQP_URL: The Azure Servicebus AMQP Url <example: 'amqps://<AccessKey>:<Access>@<namespace>.servicebus.windows.net'>
 
 * = requried
