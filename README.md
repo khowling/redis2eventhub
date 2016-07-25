@@ -4,6 +4,10 @@
 Send Redis List into Event Hub, pops messages from the queue (brpop), and sneds to Azure event hub using the AMQP 1.0 protocol.  
 
 
+to start run:
+
+> npm start
+
 Files
 
 index.js :  sends data from a Redis queue to an Azure eventhub
