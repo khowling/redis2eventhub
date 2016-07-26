@@ -27,42 +27,61 @@ if (!ENTITY_PATH || !AMQP_URL) {
 }
    
 var client = new AMQPClient(Policy.EventHub) // Uses PolicyBase default policy
-var sent = 0, confirmed = 0, errors = 0
+var sent = 0, settled = 0, errors = 0, linkCredit = 0, waiting_pop = false
+// create AMQP Connection to the Azure Service Bus Container namespace (expensive, setup TCP/TLS etc)
 client.connect(AMQP_URL).then(() => {
+    // this nodejs app 'Node', opens up a 'link' by calling 'attach' between itself (as sender) & the EventHub 'Node' (as receiver)
     client.createSender(ENTITY_PATH).then ((sender) => {
-        sender.on('errorReceived', function (tx_err) { console.warn('===> TX ERROR: ', tx_err); });
-        //let test_message = { DataString: 'From Node', DataValue: "hello from index2" }; 
-        let options = { annotations: { 'x-opt-partition-key': 'pk' + 'nodeapp' } }; 
+        sender.on('errorReceived', (tx_err) => {
+            console.warn('===> TX ERROR: ', tx_err)
+            console.log(`===> TX messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors} (linkCredit: ${linkCredit})`)
+        });
+
         let subscribe = () => {
-                redis.brpop(REDIS_CHANNEL, 0).then ((message) => {
-                    try {
-                        let msg = JSON.parse(message[1]);
-                        sender.send(msg).then ((res) => {
-                            // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
-                            confirmed++; 
-                        }, (err) => {
+                if (sent - (settled+errors) < (linkCredit - 50) && waiting_pop == false) {
+                    waiting_pop = true;
+                    redis.brpop(REDIS_CHANNEL, 0).then ((message) => {
+                        waiting_pop = false
+                        try {
+                            let msg = JSON.parse(message[1]);
+                            sender.send(msg).then ((res) => {
+                                // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
+                                settled++; 
+                                subscribe();
+                            }, (err) => {
+                                errors++;
+                                redis.lpush(`${REDIS_CHANNEL}:failed`, message[1])
+                                console.log (`===> TX Error: ${JSON.stringify(err)}`)
+                                subscribe();
+                            });
+                            
+                            sent++;
+                        } catch (e) {
                             errors++;
-                            console.log (`===> TX ERROR: ${JSON.stringify(err)}`)
-                        });
-                        sent++
-                        subscribe()
-                    } catch (e) {
-                        console.error (`failed to process redis message ${e}`);
-                    }
-                });
+                            redis.lpush(`${REDIS_CHANNEL}:failed`, message[1])
+                            console.error (`failed to JSON parse redis message ${e}`)
+                        }
+                        // if link capacity, then get next value
+                        subscribe();
+                    }, (err) => console.error (`failed redis brpop ${err}`));
+                }
             };
-        // start the blocking loop
-        subscribe();
+        // Manage message flow control
+        sender.on('creditChange', (flow) => {
+            //console.log(`===> TX flow frame: linkCredit: ${flow.linkCredit}, delivery: ${flow.deliveryCount}. messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors} (linkCredit: ${linkCredit})`)
+            linkCredit = flow.linkCredit
+            subscribe();
+        })
 
         // close down connections on ctrl-c
         process.on ('SIGINT', (code) => {
             try {
-                sender.detach().then((res) => console.log ('closed sender'))
+                sender.detach().then((res) => console.log ('detached sender'))
                 console.log ('closed connetions')
             } catch (e) {
                 console.log (`cannot detach sender: ${e}`)
             }
-            process.exit(0)
+            setInterval (() => process.exit(0), 500);
         })
     }, (err) => console.log (`failed to create sneder : ${err}`))
 }, (err) => console.log (`failed to connect to eventhub : ${err}`))
@@ -71,9 +90,9 @@ client.connect(AMQP_URL).then(() => {
 // stdout logging
 var s = 0, c = 0, e = 0 // to detect changes in metrics, only log if changed
 setInterval(() => {
-    if (sent !== s || confirmed !== c || errors !== e) {
-        s = sent; c = confirmed; e = errors;
-        console.log (`inprogress: ${sent - confirmed}, confirmed: ${confirmed}, errors: ${errors})`)
+    if (sent !== s || settled !== c || errors !== e) {
+        s = sent; c = settled; e = errors;
+        console.log (`messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors} (linkCredit: ${linkCredit} / waiting: ${waiting_pop})`)
     }
 }, 2000);
 
