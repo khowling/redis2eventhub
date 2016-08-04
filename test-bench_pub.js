@@ -22,16 +22,17 @@ if (cluster.isMaster) {
     redis.on("ready", (c) => {
         console.log ('redis ready');
         let promiseArray = [];
-        for (var l = 0; l < (process.env.MESSAGES || 10); l++) {
+        for (var l = 0; l < (process.env.MESSAGES || 1000); l++) {
             let jsonmsg_json = `{"itteration":"${l}","workerid":"${cluster.worker.id}","message":"hello from ${cluster.worker.id}:${l}"}`,
                 jsonmsg_obj = JSON.parse(jsonmsg_json);
-            //let publish_promise = redis.publish(REDIS_CHANNEL,  `{"itteration": ${l}, "workerid": ${cluster.worker.id}, "message": "hello from ${cluster.worker.id}:${l}"}`);
-            let publish_promise = redis.lpush(REDIS_CHANNEL, jsonmsg_json);
-            if (process.env.DELAY) {
-                promiseArray.push (() => {return new Promise((a,b) => setTimeout (() => {console.log (`send from ${cluster.worker.id}/${l}`); publish_promise.then(() => a());}, process.env.DELAY))});
-            } else {
-                promiseArray.push (publish_promise);
-            }
+            let publish_promise = 
+ 
+            promiseArray.push (() => {
+                return new Promise((a,b) => 
+                    setTimeout (() => {
+                        redis.publish(REDIS_CHANNEL,  jsonmsg_json)
+                        a()
+                    }, 1))});
         }
         promiseArray.reduce((p, fn) => p.then(fn, (err) => console.log (`send error : ${JSON.stringify(err)}`)), Promise.resolve()).then((res) => {
             console.log (`finished ${cluster.worker.id}`);
