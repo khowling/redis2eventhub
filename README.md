@@ -16,9 +16,9 @@ npm start
 
 ##### Files
 
-* `index.js` :  sends data from a Redis queue to an Azure eventhub
+* `index.js` :  sends data from a Redis queue to an Azure eventhub (`index_pub_sub.js` same for pub/sub)
 * `rx.js` : receive data from the hub (just for debugging verification)
-* `test-bench.js`: pumps data into redis using a cluster for 4 processes (bench testing)
+* `test-bench.js`: testing, pumps data into redis using a cluster for 4 processes (`test-bench_pub.js` same for pub/sub)
 
 ##### environment variables
 
