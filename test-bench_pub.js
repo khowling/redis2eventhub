@@ -22,7 +22,7 @@ if (cluster.isMaster) {
     redis.on("ready", (c) => {
         console.log ('redis ready');
         let promiseArray = [];
-        for (var l = 0; l < (process.env.MESSAGES || 1000); l++) {
+        for (var l = 0; l < (process.env.MESSAGES || 10000); l++) {
             let jsonmsg_json = `{"itteration":"${l}","workerid":"${cluster.worker.id}","message":"hello from ${cluster.worker.id}:${l}"}`,
                 jsonmsg_obj = JSON.parse(jsonmsg_json);
             let publish_promise = 
@@ -32,7 +32,7 @@ if (cluster.isMaster) {
                     setTimeout (() => {
                         redis.publish(REDIS_CHANNEL,  jsonmsg_json)
                         a()
-                    }, 1))});
+                    }, 0))});
         }
         promiseArray.reduce((p, fn) => p.then(fn, (err) => console.log (`send error : ${JSON.stringify(err)}`)), Promise.resolve()).then((res) => {
             console.log (`finished ${cluster.worker.id}`);

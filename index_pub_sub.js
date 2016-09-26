@@ -34,7 +34,7 @@ client.connect(AMQP_URL).then(() => {
     client.createSender(ENTITY_PATH).then ((sender) => {
         sender.on('errorReceived', (tx_err) => {
             console.warn('===> TX ERROR: ', tx_err)
-            console.log(`===> TX messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors} (linkCredit: ${linkCredit})`)
+            console.log(`===> TX messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors}`) // (linkCredit: ${linkCredit})`)
         });
         redis.psubscribe("*",  (err, count) => {
             if (err) {
