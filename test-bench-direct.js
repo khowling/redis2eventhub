@@ -38,6 +38,14 @@ client.connect(AMQP_URL).then(() => {
                 }, (err) => {
                     errors++;
                     console.log (`===> TX Error: ${JSON.stringify(err)}`)
+                    // most likly throttling, so wait
+                    if (sint) {
+                        console.log('PAUSING, Errors MOST LIKLEY THROTTLING')
+                        clearInterval (sint); sint = null;
+                        setTimeout(() => { 
+                            console.log ('restarting..')
+                            sint = setInterval(subscribe, Math.random() * DELAY_TO_PREVENT_THROTTLING) }, 15000)
+                    }
                 });
                 sent++;
             } catch (e) {
@@ -47,17 +55,17 @@ client.connect(AMQP_URL).then(() => {
         };
 
         const DELAY_TO_PREVENT_THROTTLING = 5 // 5 should be ok for 1 unit
-        let sint
+        let sint = null
         // Manage message flow control
         sender.on('creditChange', (flow) => {
             //console.log(`===> TX flow frame: linkCredit: ${flow.linkCredit}, delivery: ${flow.deliveryCount}. messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors} (linkCredit: ${linkCredit})`)
             linkCredit = flow.linkCredit
-            if (sent - (settled+errors) > (linkCredit - 50)) {
-                 console.log('PAUSING, LINK ALMOST FULL')
-                clearInterval (sint);
+            if (sint && (sent - (settled+errors) > (linkCredit - 50))) {
+                console.log('PAUSING, LINK ALMOST FULL')
+                clearInterval (sint); sint = null;
                 setTimeout(() => { 
                     console.log ('restarting..')
-                    sint = setInterval(subscribe, Math.random() * DELAY_TO_PREVENT_THROTTLING) }, 5000)
+                    sint = setInterval(subscribe, Math.random() * DELAY_TO_PREVENT_THROTTLING) }, 15000)
             }
         })
 
