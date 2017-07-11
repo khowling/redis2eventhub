@@ -27,40 +27,42 @@ client.connect(AMQP_URL).then(() => {
         });
 
         const subscribe = () => {
-                if (sent - (settled+errors) < (linkCredit - 50) && waiting_pop == false) {
+            let bytes = parseInt(Math.random().toString().substr(2,1 + Math.floor(Math.random() * 6))),
+                site = ["youtube", "youtube", "netflix", "netflix", "netflix", "iplayer", "other"][Math.floor(Math.random() * 7)],
+                message = `{"url" : "https://${site}/wfwefwef", "time": ${new Date().getTime()}, "site": "${site}", "bytes": ${bytes}}`
 
-                    let bytes = parseInt(Math.random().toString().substr(2,1 + Math.floor(Math.random() * 6))),
-                        site = ["youtube", "youtube", "netflix", "netflix", "netflix", "iplayer", "other"][Math.floor(Math.random() * 7)],
-                        message = `{"url" : "https://${site}/wfwefwef", "time": ${new Date().getTime()}, "site": "${site}", "bytes": ${bytes}}`
+            try {
+                let msg = JSON.parse(message)
+                sender.send(msg).then ((res) => {
+                    settled++; 
+                }, (err) => {
+                    errors++;
+                    console.log (`===> TX Error: ${JSON.stringify(err)}`)
+                });
+                sent++;
+            } catch (e) {
+                errors++;
+                console.error (`failed to JSON parse  message ${e}`)
+            }
+        };
 
-                    try {
-                        let msg = JSON.parse(message);
-                        sender.send(msg).then ((res) => {
-                            // promises are resolved when a disposition frame is received from the remote link for the sent message, at this point the message is considered "settled". 
-                            settled++; 
-                            subscribe();
-                        }, (err) => {
-                            errors++;
-                           
-                            console.log (`===> TX Error: ${JSON.stringify(err)}`)
-                            subscribe();
-                        });
-                        
-                        sent++;
-                    } catch (e) {
-                        errors++;
-                        console.error (`failed to JSON parse  message ${e}`)
-                    }
-                    // if link capacity, then get next value
-                    subscribe();
-                }
-            };
+        const DELAY_TO_PREVENT_THROTTLING = 5 // 5 should be ok for 1 unit
+        let sint
         // Manage message flow control
         sender.on('creditChange', (flow) => {
             //console.log(`===> TX flow frame: linkCredit: ${flow.linkCredit}, delivery: ${flow.deliveryCount}. messages sending: ${sent - (settled+errors)}, settled: ${settled}, failed: ${errors} (linkCredit: ${linkCredit})`)
             linkCredit = flow.linkCredit
-            subscribe();
+            if (sent - (settled+errors) > (linkCredit - 50)) {
+                 console.log('PAUSING, LINK ALMOST FULL')
+                clearInterval (sint);
+                setTimeout(() => { 
+                    console.log ('restarting..')
+                    sint = setInterval(subscribe, Math.random() * DELAY_TO_PREVENT_THROTTLING) }, 5000)
+            }
         })
+
+        sint = setInterval(subscribe, Math.random() * DELAY_TO_PREVENT_THROTTLING)
+
 
         // close down connections on ctrl-c
         process.on ('SIGINT', (code) => {
