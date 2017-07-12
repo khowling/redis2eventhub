@@ -10,8 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "ioredis": "^2.2.0",
-    "amqp10": "^3.2.2"
+    "ioredis": "*",
+    "amqp10": "*"
   },
   "engines": {
     "version": "6.2.1"

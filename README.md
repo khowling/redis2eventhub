@@ -1,36 +1,34 @@
 
 
 
-## Send JSON data in a _Redis List_ into _Azure Event Hub_, 
+## Send JSON data from a *Redis List* into *Azure Event Hub*, 
 
 A console app that opens a Link to *Azure Event Hub*, pops JSON messages from a redis List using blocking call (brpop), and sends to the event hub using the AMQP 1.0 protocol.  Continounsly runs, message flow control is observed using "Link Credits". Use Ctrl-C to stop.
 
 to install and run (have node installed - version required in package.json)
-```
-git clone https://github.com/khowling/redis2eventhub.git
-cd redis2eventhub
-npm install
-npm start
-```
 
 
-##### Files
 
-* `index.js` :  sends data from a Redis queue to an Azure eventhub (`index_pub_sub.js` same for pub/sub)
-* `rx.js` : receive data from the hub (just for debugging verification)
-* `test-bench.js`: testing, pumps data into redis using a cluster for 4 processes (`test-bench_pub.js` same for pub/sub)
 
-##### environment variables
+## Files
+
+* `index.js` pop data from a Redis queue to an Azure eventhub   
+  * (`index_pub_sub.js` same for pub/sub)
+* `rx.js` receive data from the hub (just for debugging verification)
+* `test-bench.js`testing, pumps data into redis using a cluster for 4 processes 
+  * (`test-bench_pub.js` same for pub/sub)
+* `test-bench-direct.js` pumps random data directly into EventHub (no Redis) 
+
+### environment variables
 
 * `REDIS_URL`:     \<default: `redis://localhost:6379/3`\>
 * `REDIS_CHANNEL`: The Redis List Key \<default: `clickpath`\>
-* *`AMQP_URL`:     The Azure Servicebus AMQP Url <example: 'amqps://\<AccessKeyName\>:\<AccessKey\>@\<namespace\>.servicebus.windows.net'
-* *`ENTITY_PATH`:  The Azure eventhub Entity name
+* `AMQP_URL`:     The Azure Servicebus AMQP Url <example: 'amqps://\<AccessKeyName\>:\<AccessKey\>@\<namespace\>.servicebus.windows.net'
+* `ENTITY_PATH`:  The Azure eventhub Entity name
 * `DEBUG="amqp10:client"`:  to debug (or for full debugging "amqp10:*")
 
 (in lunix `ENV_VAR="value"`, in windows `$env:ENV_VAR = "value"`)
 
-(* = requried)
 
 ### just background reading
 
