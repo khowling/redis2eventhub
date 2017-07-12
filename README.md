@@ -1,12 +1,8 @@
 
 
 
-## Send JSON data from a *Redis List* into *Azure Event Hub*, 
 
 A console app that opens a Link to *Azure Event Hub*, pops JSON messages from a redis List using blocking call (brpop), and sends to the event hub using the AMQP 1.0 protocol.  Continounsly runs, message flow control is observed using "Link Credits". Use Ctrl-C to stop.
-
-to install and run (have node installed - version required in package.json)
-
 
 
 
